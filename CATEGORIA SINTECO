@@ -1,0 +1,113 @@
+Imports System.Windows.Forms
+
+Sub Main()
+    ' Verifica se o documento ativo é um desenho
+    If ThisApplication.ActiveDocumentType <> DocumentTypeEnum.kDrawingDocumentObject Then
+        MessageBox.Show("Abra um desenho (.idw) antes de rodar esta regra.", "Erro")
+        Return
+    End If
+
+    Dim oDrawDoc As DrawingDocument = ThisApplication.ActiveDocument
+    Dim oSheet As Sheet = oDrawDoc.ActiveSheet
+
+    ' Verifica se a folha tem pelo menos uma vista
+    If oSheet.DrawingViews.Count = 0 Then
+        MessageBox.Show("A folha ativa não contém vistas.", "Erro")
+        Return
+    End If
+
+    ' Pega o documento referenciado na primeira vista
+    Dim oView As DrawingView = oSheet.DrawingViews.Item(1)
+    Dim oRefDoc As Document
+
+    Try
+        oRefDoc = oView.ReferencedDocumentDescriptor.ReferencedDocument
+    Catch ex As Exception
+        MessageBox.Show("Erro ao acessar o modelo referenciado: " & ex.Message, "Erro")
+        Return
+    End Try
+
+    ' Acessa o PropertySet "Inventor Document Summary Information"
+    Dim docSummaryProps As PropertySet
+    Try
+        docSummaryProps = oRefDoc.PropertySets.Item("Inventor Document Summary Information")
+    Catch ex As Exception
+        MessageBox.Show("Erro ao acessar o conjunto de propriedades: " & ex.Message, "Erro")
+        Return
+    End Try
+
+    ' Lê o valor atual da propriedade "Category"
+    Dim currentCategory As String = ""
+    Try
+        currentCategory = docSummaryProps.Item("Category").Value.ToString()
+    Catch
+        currentCategory = ""
+    End Try
+
+    ' Cria o formulário
+    Dim frm As New Form With {
+        .Text = "Editar Categoria do Modelo",
+        .Width = 500,
+        .Height = 200,
+        .StartPosition = FormStartPosition.CenterScreen
+    }
+
+    ' Label
+    Dim lbl As New Label With {
+        .Text = "Categoria:",
+        .Top = 20,
+        .Left = 20,
+        .Width = 100
+    }
+    frm.Controls.Add(lbl)
+
+    ' ComboBox
+    Dim cboCategoria As New ComboBox With {
+        .Top = 50,
+        .Left = 20,
+        .Width = 440,
+        .DropDownStyle = ComboBoxStyle.DropDown
+    }
+
+    ' Opções sugeridas
+    cboCategoria.Items.AddRange(New String() {
+    "27 - INTERNO - CORTE LASER CH - CC",
+    "47 - INTERNO - CORTE LASER TB - CT",
+    "30 - INTERNO - SERRA FITA - SF",
+    "33 - INTERNO - USINAGEM - UI",
+    "28 - INTERNO - DOBRA - DO",
+    "29 - INTERNO - MONTAGEM/SOLDA - MS",
+    "32 - INTERNO - MONTAGEM FINAL - MF",
+    "38 - ELETRICA / AUTOMAÇAO - EA",
+    "42 - USINAGEM EXTERNA - POLIMEROS - UEPM",
+    "43 - USINAGEM EXTERNA - ALUMINIO - UEAL",
+    "44 - USINAGEM EXTERNA - POLICARBONATO - UEPC",
+    "45 - USINAGEM EXTERNA - ELETROFUSAO - UEEF",
+    "46 - USINAGEM EXTERNA - INOX - UEIN"
+})
+    ' Valor atual
+    cboCategoria.Text = currentCategory
+    frm.Controls.Add(cboCategoria)
+
+    ' Botão Aplicar
+    Dim btnAplicar As New Button With {
+        .Text = "Aplicar",
+        .Top = 100,
+        .Left = 20,
+        .Width = 440
+    }
+    AddHandler btnAplicar.Click, Sub()
+        Try
+            docSummaryProps.Item("Category").Value = cboCategoria.Text
+            oRefDoc.Save() ' Salva o modelo
+            MessageBox.Show("Categoria do modelo atualizada com sucesso!", "Sucesso")
+            frm.Close()
+        Catch ex As Exception
+            MessageBox.Show("Erro ao atualizar propriedade: " & ex.Message, "Erro")
+        End Try
+    End Sub
+    frm.Controls.Add(btnAplicar)
+
+    ' Exibe o formulário
+    frm.ShowDialog()
+End Sub
