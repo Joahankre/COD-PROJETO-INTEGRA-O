@@ -1,0 +1,72 @@
+Sub Main()
+    ' Obtém o documento ativo (DrawingDocument)
+    Dim oDoc As DrawingDocument = ThisDoc.Document
+    Dim oSheets As Sheets = oDoc.Sheets
+    Dim sheetInfo As New List(Of Tuple(Of String, Integer)) ' Lista para armazenar (Modelo, Folha)
+
+    ' Preenche sheetInfo com o modelo referenciado e o número da folha
+    For sheetIndex As Integer = 1 To oSheets.Count
+        Dim oSheet As Sheet = oSheets.Item(sheetIndex)
+        If oSheet.DrawingViews.Count > 0 Then
+            Dim oView As DrawingView = oSheet.DrawingViews(1)
+            Dim oModelName As String = oView.ReferencedDocumentDescriptor.ReferencedDocument.DisplayName
+            sheetInfo.Add(Tuple.Create(oModelName, sheetIndex))
+        End If
+    Next
+
+    ' Armazenar as informações agrupadas em um arquivo temporário
+    Dim modelGroups As New List(Of Tuple(Of String, Integer, Integer)) ' Lista para armazenar (Modelo, Início da Folha, Fim da Folha)
+    Dim currentModel As String = ""
+    Dim startIndex As Integer = 0
+    Dim endIndex As Integer = 0
+
+    ' Agrupa folhas consecutivas com o mesmo modelo
+    For i As Integer = 0 To sheetInfo.Count - 1
+        ' Se o modelo mudar, registra o intervalo e começa um novo grupo
+        If sheetInfo(i).Item1 <> currentModel Then
+            If currentModel <> "" Then
+                modelGroups.Add(Tuple.Create(currentModel, startIndex, endIndex))
+            End If
+            currentModel = sheetInfo(i).Item1
+            startIndex = sheetInfo(i).Item2
+            endIndex = startIndex
+        Else
+            ' Se o modelo for o mesmo, avança o índice final
+            If sheetInfo(i).Item2 = endIndex + 1 Then
+                endIndex = sheetInfo(i).Item2
+            Else
+                ' Registra o grupo anterior
+                modelGroups.Add(Tuple.Create(currentModel, startIndex, endIndex))
+                startIndex = sheetInfo(i).Item2
+                endIndex = startIndex
+            End If
+        End If
+    Next
+
+    ' Registra o último grupo
+    modelGroups.Add(Tuple.Create(currentModel, startIndex, endIndex))
+
+    ' Atribui a propriedade "Sheet Number" para os modelos agrupados
+    For Each Group As Tuple(Of String, Integer, Integer) In modelGroups
+        Dim sheetNumberProp As String
+        If Group.Item2 = Group.Item3 Then
+            sheetNumberProp = Format(Group.Item2, "00") ' Folha única
+        Else
+            sheetNumberProp = Format(Group.Item2, "00") & "-" & Format(Group.Item3, "00") ' Folhas consecutivas
+        End If
+
+        ' Atribui a propriedade apenas uma vez para o modelo
+        For j As Integer = Group.Item2 To Group.Item3
+            Dim oSheet As Sheet = oSheets.Item(j)
+            Dim oView As DrawingView = oSheet.DrawingViews(1)
+            Dim oModel As Document = oView.ReferencedDocumentDescriptor.ReferencedDocument
+            Dim oModelName As String = oModel.DisplayName
+
+            ' Atribui a propriedade apenas uma vez para o modelo
+            iProperties.Value(oModelName, "Custom", "Num Pág") = sheetNumberProp
+        Next
+    Next
+
+    ' Exibe mensagem de sucesso
+    MessageBox.Show("Propriedade 'Pag.s' atualizada com sucesso.")
+End Sub
