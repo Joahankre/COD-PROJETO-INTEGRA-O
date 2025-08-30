@@ -1,0 +1,60 @@
+Sub Main()
+    ' Verifica se o documento é uma peça de chapa metálica
+    Dim doc As PartDocument = ThisDoc.Document
+    If doc.SubType <> "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}" Then
+        MessageBox.Show("Este documento não é uma chapa metálica.", "Erro")
+        Return
+    End If
+
+    ' Gera a flat pattern caso não exista
+    Dim def As SheetMetalComponentDefinition = doc.ComponentDefinition
+    If Not def.HasFlatPattern Then
+        def.Unfold()
+        def.FlatPattern.ExitEdit()
+    End If
+
+    ' Pergunta ao usuário onde salvar o DXF
+    Dim pastaDestino As String = SelecionarPasta()
+    If String.IsNullOrEmpty(pastaDestino) Then
+        MessageBox.Show("Exportação cancelada.", "Aviso")
+        Return
+    End If
+
+    ' Define o caminho completo para o arquivo DXF
+    Dim nomeArquivo As String = IO.Path.GetFileNameWithoutExtension(doc.FullFileName)
+    Dim caminhoDXF As String = IO.Path.Combine(pastaDestino, nomeArquivo & ".dxf")
+
+    ' Configuração para exportar apenas contornos internos e externos
+    Dim dxfConfig As String = _
+        "FLAT PATTERN DXF?AcadVersion=2018" & _
+        "&RebaseGeometry=True" & _
+        "&OuterProfileLayer=Contorno_Externo" & _
+        "&OuterProfileLayerColor=255;0;0" & _
+        "&InteriorProfilesLayer=Contornos_Internos" & _
+        "&InteriorProfilesLayerColor=0;0;255" & _
+        "&InvisibleLayers=IV_TANGENT;IV_ARC_CENTERS;IV_BEND;IV_BEND_DOWN;" & _
+        "IV_TOOL_CENTER;IV_TOOL_CENTER_DOWN;IV_FEATURE_PROFILES;IV_FEATURE_PROFILES_DOWN;" & _
+        "IV_ALTREP_FRONT;IV_ALTREP_BACK;IV_UNCONSUMED_SKETCHES;IV_ROLL_TANGENT;IV_ROLL"
+
+    ' Exporta o arquivo DXF
+    Try
+        def.FlatPattern.DataIO.WriteDataToFile(dxfConfig, caminhoDXF)
+        MessageBox.Show("DXF exportado com sucesso para:" & vbCrLf & caminhoDXF, "Concluído")
+    Catch ex As Exception
+        MessageBox.Show("Erro na exportação: " & ex.Message, "Erro")
+    End Try
+End Sub
+
+Function SelecionarPasta() As String
+    Dim pastaSelecionada As String = ""
+    Try
+        Dim dialog As New System.Windows.Forms.FolderBrowserDialog
+        dialog.Description = "Selecione a pasta para salvar o arquivo DXF"
+        If dialog.ShowDialog() = System.Windows.Forms.DialogResult.OK Then
+            pastaSelecionada = dialog.SelectedPath
+        End If
+    Catch ex As Exception
+        MessageBox.Show("Erro ao selecionar pasta: " & ex.Message)
+    End Try
+    Return pastaSelecionada
+End Function
