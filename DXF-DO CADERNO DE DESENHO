@@ -1,0 +1,139 @@
+Imports System.Windows.Forms
+Imports System.IO
+Imports Inventor
+
+
+
+Sub Main()
+
+    Dim oDoc As DrawingDocument = ThisApplication.ActiveDocument
+    If oDoc.DocumentType <> DocumentTypeEnum.kDrawingDocumentObject Then
+        MessageBox.Show("Este não é um documento de desenho.")
+        Return
+    End If
+	Dim prefixoCliente As String = InputBox("Informe o código do cliente/máquina (ex: PXS-BTR):", "Código de Identificação")
+
+    If String.IsNullOrEmpty(prefixoCliente) Then
+    MessageBox.Show("Exportação cancelada. Código de identificação não fornecido.", "Aviso")
+    Return
+    End If
+
+    ' Selecionar pasta de destino
+    Dim pastaDestino As String = SelecionarPasta()
+    If String.IsNullOrEmpty(pastaDestino) Then
+        MessageBox.Show("Exportação cancelada.", "Aviso")
+        Return
+    End If
+
+    Dim exportados As Integer = 0
+    Dim erros As String = ""
+
+    ' Iterar sobre folhas e vistas
+    For Each drawSheet As Sheet In oDoc.Sheets
+        For Each DrawingView As DrawingView In drawSheet.DrawingViews
+
+            Dim refDoc As Document = Nothing
+            Try
+                refDoc = DrawingView.ReferencedDocumentDescriptor.ReferencedDocument
+            Catch
+                Continue For
+            End Try
+
+            If refDoc IsNot Nothing AndAlso refDoc.DocumentType = DocumentTypeEnum.kPartDocumentObject Then
+
+                ' Verificar se é chapa metálica
+                If refDoc.DocumentSubType.DocumentSubTypeID = "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}" Then
+                    Dim partDoc As PartDocument = TryCast(refDoc, PartDocument)
+                    Dim smDef As SheetMetalComponentDefinition = TryCast(partDoc.ComponentDefinition, SheetMetalComponentDefinition)
+
+                    If smDef IsNot Nothing Then
+                        ' Garantir que Flat Pattern exista
+                        If Not smDef.HasFlatPattern Then
+                            Try
+                                smDef.Unfold()
+                                smDef.FlatPattern.ExitEdit()
+                            Catch ex As Exception
+                                erros &= vbCrLf & partDoc.DisplayName & ": ERRO ao criar FlatPattern"
+                                Continue For
+                            End Try
+                        End If
+
+                        ' Criar caminho do arquivo DXF
+                        ' Obter nome da peça
+' Obter número da página
+Dim sheetName As String = drawSheet.Name
+Dim pageNumber As String = sheetName.Substring(sheetName.LastIndexOf(":") + 1)
+Dim formattedPageNumber As String
+If Integer.TryParse(pageNumber, 0) Then
+    formattedPageNumber = pageNumber.PadLeft(3, "0"c)
+Else
+    formattedPageNumber = "000"
+End If
+
+' Obter quantidade personalizada
+Dim qtdePersonalizada As String = ""
+Try
+    qtdePersonalizada = partDoc.PropertySets.Item("User Defined Properties").Item("QTDE PERSONALIZADA").Value.ToString()
+Catch ex As Exception
+    qtdePersonalizada = "001"
+End Try
+
+Dim formattedQtde As String = qtdePersonalizada.PadLeft(3, "0"c) & "X"
+
+' Nome final conforme padrão: PXS-BTR-002-010X.dxf
+Dim nomeFinal As String = prefixoCliente & "-" & formattedPageNumber & "-" & formattedQtde & ".dxf"
+nomeFinal = nomeFinal.Replace(" ", "_")
+
+' Caminho final para o DXF
+Dim caminhoDXF As String = System.IO.Path.Combine(pastaDestino, nomeFinal)
+
+
+
+                        ' Configurações de exportação - apenas contornos
+                        Dim dxfConfig As String = _
+                            "FLAT PATTERN DXF?AcadVersion=2018" & _
+                            "&RebaseGeometry=True" & _
+                            "&OuterProfileLayer=Contorno_Externo" & _
+                            "&OuterProfileLayerColor=255;0;0" & _
+                            "&InteriorProfilesLayer=Contornos_Internos" & _
+                            "&InteriorProfilesLayerColor=0;0;255" & _
+                            "&InvisibleLayers=IV_TANGENT;IV_ARC_CENTERS;IV_BEND;IV_BEND_DOWN;" & _
+                            "IV_TOOL_CENTER;IV_TOOL_CENTER_DOWN;IV_FEATURE_PROFILES;IV_FEATURE_PROFILES_DOWN;" & _
+                            "IV_ALTREP_FRONT;IV_ALTREP_BACK;IV_UNCONSUMED_SKETCHES;IV_ROLL_TANGENT;IV_ROLL"
+
+                        ' Exportar para DXF
+                        Try
+                            smDef.FlatPattern.DataIO.WriteDataToFile(dxfConfig, caminhoDXF)
+                            exportados += 1
+                        Catch ex As Exception
+                            erros &= vbCrLf & nomePeca & ": ERRO ao exportar - " & ex.Message
+                        End Try
+                    End If
+                End If
+            End If
+        Next
+    Next
+
+    ' Resultado final
+    Dim msg As String = "Exportação concluída." & vbCrLf & "Arquivos exportados: " & exportados
+    If erros <> "" Then
+        msg &= vbCrLf & "Ocorreram erros nas seguintes peças:" & vbCrLf & erros
+    End If
+    MessageBox.Show(msg, "Resultado da Exportação")
+
+End Sub
+
+Function SelecionarPasta() As String
+	
+    Dim pastaSelecionada As String = ""
+    Try
+        Dim dialog As New FolderBrowserDialog()
+        dialog.Description = "Selecione a pasta para salvar os arquivos DXF"
+        If dialog.ShowDialog() = DialogResult.OK Then
+            pastaSelecionada = dialog.SelectedPath
+        End If
+    Catch ex As Exception
+        MessageBox.Show("Erro ao selecionar pasta: " & ex.Message)
+    End Try
+    Return pastaSelecionada
+End Function
