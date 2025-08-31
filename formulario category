@@ -22,37 +22,42 @@ End If
 ' ===== FORMULÁRIO DE SELEÇÃO DE FOLHAS =====
 Dim frmSelecao As New System.Windows.Forms.Form With {
     .Text = "Selecione as folhas para editar",
-    .Width = 400,
-    .Height = 400,
-    .StartPosition = FormStartPosition.CenterScreen
+    .Width = 600,
+    .Height = 500,
+    .StartPosition = FormStartPosition.CenterScreen,
+    .FormBorderStyle = FormBorderStyle.Sizable
 }
 
 Dim lblInstrucao As New System.Windows.Forms.Label With {
     .Text = "Selecione as folhas em que deseja editar a categoria:",
     .Top = 10,
     .Left = 10,
-    .Width = 360
+    .Width = 560,
+    .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 }
 frmSelecao.Controls.Add(lblInstrucao)
 
-Dim lstFolhas As New System.Windows.Forms.ListBox With {
+Dim lstFolhas As New System.Windows.Forms.CheckedListBox With {
     .Top = 40,
     .Left = 10,
-    .Width = 360,
-    .Height = 250,
-    .SelectionMode = SelectionMode.MultiExtended
+    .Width = 560,
+    .Height = 360,
+    .CheckOnClick = True,
+    .Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
 }
 lstFolhas.Items.AddRange(folhasValidas.ToArray())
 frmSelecao.Controls.Add(lstFolhas)
 
 Dim btnOk As New System.Windows.Forms.Button With {
     .Text = "Confirmar",
-    .Top = 300,
+    .Top = 420,
     .Left = 10,
-    .Width = 360
+    .Width = 560,
+    .Height = 30,
+    .Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
 }
 AddHandler btnOk.Click, Sub()
-    If lstFolhas.SelectedItems.Count = 0 Then
+    If lstFolhas.CheckedItems.Count = 0 Then
         MessageBox.Show("Selecione ao menos uma folha.", "Aviso")
         Return
     End If
@@ -67,9 +72,10 @@ End If
 
 ' Coletar folhas selecionadas
 Dim folhasSelecionadas As New List(Of String)
-For Each item In lstFolhas.SelectedItems
+For Each item In lstFolhas.CheckedItems
     folhasSelecionadas.Add(item.ToString())
 Next
+
 
 ' ===== LOOP APENAS NAS FOLHAS SELECIONADAS =====
 For Each oSheet In oDrawDoc.Sheets
