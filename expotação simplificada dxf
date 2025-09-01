@@ -1,0 +1,87 @@
+' === iLogic Rule ===
+' Exporta automaticamente o FlatPattern como DXF, usando o comando nativo GeomToDXFCommand
+
+Imports System.Windows.Forms
+
+' === Verifica se o documento ativo é uma peça (.ipt) ===
+If ThisApplication.ActiveDocument.DocumentType <> DocumentTypeEnum.kPartDocumentObject Then
+	MessageBox.Show("Abra um arquivo de peça (.ipt) para executar esta regra.", "Erro")
+	Return
+End If
+
+Dim oDoc As PartDocument
+Dim oCD As SheetMetalComponentDefinition
+Dim flatFace As Face
+Dim selectedPath As String = ""
+Dim dxfFileName As String = ""
+Dim Error0 As Integer
+
+On Error GoTo ErroGeral
+
+' === Define documento e componente ===
+oDoc = ThisApplication.ActiveDocument
+oCD = oDoc.ComponentDefinition
+
+' === Verifica se é chapa metálica ===
+If oDoc.SubType <> "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}" Then
+	MessageBox.Show("Esta peça não é uma chapa metálica.", "Erro")
+	Return
+End If
+
+' === Garante que o Flat Pattern esteja desdobrado ===
+If Not oCD.HasFlatPattern Then
+	oCD.Unfold()
+Else
+	oCD.FlatPattern.Edit()
+End If
+
+' === Seleciona a face frontal do flat pattern ===
+flatFace = oCD.FlatPattern.TopFace
+If flatFace Is Nothing Then
+	MessageBox.Show("Não foi possível identificar a face frontal do plano de chapa.", "Erro")
+	Return
+End If
+
+oDoc.SelectSet.Clear()
+oDoc.SelectSet.Select(flatFace)
+
+' === Caixa de diálogo para selecionar pasta ===
+Dim folderDialog As New FolderBrowserDialog()
+folderDialog.Description = "Selecione a pasta para salvar o arquivo DXF"
+folderDialog.ShowNewFolderButton = True
+
+If folderDialog.ShowDialog() = DialogResult.OK Then
+	selectedPath = folderDialog.SelectedPath
+Else
+	MessageBox.Show("Nenhuma pasta selecionada. Operação cancelada.", "Cancelado")
+	Return
+End If
+
+' === Define caminho e nome do arquivo DXF ===
+dxfFileName = selectedPath & "\" & ThisDoc.FileName(False) & ".dxf"
+
+' === Executa comando de exportação ===
+Error0 = 1
+ThisApplication.StatusBarText = "Exportando DXF, aguarde..."
+
+' Define o caminho do arquivo para o evento
+ThisApplication.CommandManager.PostPrivateEvent(kFileNameEvent, dxfFileName)
+
+' Executa o comando nativo de exportação de face como DXF
+Dim oCtrlDef As ButtonDefinition
+oCtrlDef = ThisApplication.CommandManager.ControlDefinitions.Item("GeomToDXFCommand")
+oCtrlDef.Execute()
+
+' Finaliza
+Error0 = 0
+ThisApplication.StatusBarText = "DXF exportado com sucesso."
+MessageBox.Show("DXF exportado para:" & vbCrLf & dxfFileName, "Sucesso")
+InventorVb.DocumentUpdate(False)
+Return
+
+' === Tratamento de erros ===
+ErroGeral:
+If Error0 = 1 Then
+	MessageBox.Show("Houve um erro durante a exportação DXF." & vbCrLf & "Detalhes: " & Err.Description, "Erro")
+	ThisApplication.StatusBarText = ""
+End If
